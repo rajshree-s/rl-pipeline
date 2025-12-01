@@ -95,9 +95,9 @@ class LlamaRLTrainer:
             self.model_8b = None
             torch.cuda.empty_cache()
 
-    def generate_responses(self, question: str, system_prompt: str) -> List[str]:
+    def generate_responses(self, question: str, system_prompt: str, prompt: str) -> List[str]:
         """Generate responses from 1B model"""
-        prompt = f"{system_prompt}\n\nQuestion: {question}\nAnswer:"
+        prompt = f"{system_prompt} \n\n Paragraph: {prompt} \n\nQuestion: {question}\nAnswer:"
 
         inputs = self.tokenizer_1b(
             prompt,
@@ -191,11 +191,12 @@ class LlamaRLTrainer:
             question: str,
             responses: List[str],
             rewards: torch.Tensor,
-            system_prompt: str
+            system_prompt: str,
+            prompt: str
     ) -> torch.Tensor:
         """Compute PPO loss for training"""
         ref_model = self._load_reference_model()
-        prompt = f"{system_prompt}\n\nQuestion: {question}\nAnswer:"
+        prompt = f"{system_prompt}\n\n Paragraph: {prompt}\n\nQuestion: {question}\nAnswer:"
 
         total_loss = 0
         for idx, (response, reward) in enumerate(zip(responses, rewards)):
@@ -241,14 +242,14 @@ class LlamaRLTrainer:
 
         return total_loss / len(responses)
 
-    def train_step(self, question: str, system_prompt: str):
+    def train_step(self, question: str, system_prompt: str, prompt: str):
         """Single training step"""
-        responses = self.generate_responses(question, system_prompt)
+        responses = self.generate_responses(question, system_prompt, prompt)
         rankings = self.rank_responses(question, responses)
         rewards = self.compute_rewards(rankings, len(responses))
 
         self.optimizer.zero_grad()
-        loss = self.compute_ppo_loss(question, responses, rewards, system_prompt)
+        loss = self.compute_ppo_loss(question, responses, rewards, system_prompt, prompt)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model_1b.parameters(), 1.0)
         self.optimizer.step()
@@ -264,33 +265,36 @@ class LlamaRLTrainer:
             total_loss = 0
 
             progress_bar = tqdm(dataloader, desc="Training")
+            print(progress_bar)
             for batch_idx, batch in enumerate(progress_bar):
-                question = batch['question'][0]
+                questions = batch['questions'][0]
+                para = batch['paragraph'][0]
 
-                try:
-                    loss, rankings, responses = self.train_step(question, system_prompt)
-                    total_loss += loss
+                for question in questions:
+                    try:
+                        loss, rankings, responses = self.train_step(question, system_prompt, para)
+                        total_loss += loss
 
-                    progress_bar.set_postfix({
-                        'loss': f'{loss:.4f}',
-                        'avg_loss': f'{total_loss / (batch_idx + 1):.4f}'
-                    })
+                        progress_bar.set_postfix({
+                            'loss': f'{loss:.4f}',
+                            'avg_loss': f'{total_loss / (batch_idx + 1):.4f}'
+                        })
 
-                    if True:
-                        print(f"\n{'=' * 60}")
-                        print(f"Question: {question}")
-                        print(f"\nGenerated Responses:")
-                        for i, resp in enumerate(responses, 1):
-                            rank = rankings.get(f"answer{i}", "?")
-                            print(f"  Answer {i} (Rank {rank}): {resp[:100]}...")
-                        print(f"{'=' * 60}")
+                        if True:
+                            print(f"\n{'=' * 60}")
+                            print(f"Question: {questions}")
+                            print(f"\nGenerated Responses:")
+                            for i, resp in enumerate(responses, 1):
+                                rank = rankings.get(f"answer{i}", "?")
+                                print(f"  Answer {i} (Rank {rank}): {resp[:100]}...")
+                            print(f"{'=' * 60}")
 
-                except Exception as e:
-                    print(f"Error on question: {question}")
-                    print(f"Error: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    continue
+                    except Exception as e:
+                        print(f"Error on question: {questions}")
+                        print(f"Error: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        continue
 
             avg_loss = total_loss / max(len(dataloader), 1)
             print(f"Epoch {epoch + 1} Average Loss: {avg_loss:.4f}")
