@@ -21,17 +21,17 @@ def main():
     questions = questions_para_data.data[:10]
 
     # Loop the learning process
-    train_and_save_model(iteration=0, no_of_questions=10, path=path_, dataset=questions, trainer=trainer)
+    train_and_save_model(path=path_, dataset=questions, trainer=trainer)
 
 
-def train_and_save_model(iteration: int, no_of_questions: int, path: str, dataset: Dict[Any, Any],
-                         trainer: LlamaRLTrainer):
+def train_and_save_model(path: str, dataset: Dict[Any, Any], trainer: LlamaRLTrainer):
     dataset = QuestionDataset(dataset)
     trainer.train(
         dataset=dataset,
         system_prompt=f"You are given a paragraph, read and understand it and give answers for given question.",
         save_path=path
     )
+
 
 if __name__ == "__main__":
     main()
