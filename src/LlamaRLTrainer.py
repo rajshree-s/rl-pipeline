@@ -265,7 +265,6 @@ class LlamaRLTrainer:
             total_loss = 0
 
             progress_bar = tqdm(dataloader, desc="Training")
-            print(progress_bar)
             for batch_idx, batch in enumerate(progress_bar):
                 questions = batch['questions'][0]
                 para = batch['paragraph'][0]
@@ -298,9 +297,11 @@ class LlamaRLTrainer:
 
             avg_loss = total_loss / max(len(dataloader), 1)
             print(f"Epoch {epoch + 1} Average Loss: {avg_loss:.4f}")
-            self.save_model(f"{save_path}_epoch_{epoch + 1}")
+
+            path = self.save_model(f"{save_path}_epoch_{epoch + 1}")
 
         print("\nTraining complete!")
+        return path
 
     def save_model(self, path: str):
         """Save the trained model"""

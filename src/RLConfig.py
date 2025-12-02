@@ -18,7 +18,7 @@ class RLConfig:
     value_coef: float = 0.5
     entropy_coef: float = 0.01
     gamma: float = 0.99
-    device: str = "cpu"
+    device: str = "mps"
     hf_token: str = None  # Will use Colab Secrets
     use_lora: bool = True
     use_8bit: bool = False  # Set to True if OOM errors
