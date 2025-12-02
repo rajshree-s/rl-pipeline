@@ -61,4 +61,4 @@ def responses(path):
 
 if __name__ == "__main__":
     model_path = finetune_model()
-    test_model("./models/llama_1b_rl_trained_on_coqa_dataset_epoch_1_epoch_1")
+    test_model(model_path)
