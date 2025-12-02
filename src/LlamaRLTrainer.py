@@ -297,11 +297,12 @@ class LlamaRLTrainer:
 
             avg_loss = total_loss / max(len(dataloader), 1)
             print(f"Epoch {epoch + 1} Average Loss: {avg_loss:.4f}")
+            model_path = f"{save_path}_epoch_{epoch + 1}"
+            self.save_model(model_path)
 
-            path = self.save_model(f"{save_path}_epoch_{epoch + 1}")
 
         print("\nTraining complete!")
-        return path
+        return model_path
 
     def save_model(self, path: str):
         """Save the trained model"""

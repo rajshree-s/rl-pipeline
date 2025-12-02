@@ -1,14 +1,18 @@
+from typing import List
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
+from src.QuestionDataset import QuestionDataset
 
-def query_saved_model(path):
-    tokenizer, model = load_saved_model(path)
+
+def query_model(path, question: str, hf_token=None):
+    tokenizer, model = load_saved_model(path, hf_token)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model.config.pad_token_id = tokenizer.pad_token_id
-    prompt = "What do you understand by ML?"
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512).to(model.device)
+
+    inputs = tokenizer(question, return_tensors="pt", truncation=True, max_length=512).to(model.device)
 
     with torch.no_grad():
         outputs = model.generate(
@@ -23,7 +27,7 @@ def query_saved_model(path):
     return response.strip()
 
 
-def load_saved_model(path: str):
-    tokenizer = AutoTokenizer.from_pretrained(path)
-    model = AutoModelForCausalLM.from_pretrained(path)
+def load_saved_model(path: str, hf_token=None):
+    tokenizer = AutoTokenizer.from_pretrained(path, token= hf_token) if hf_token else AutoTokenizer.from_pretrained(path)
+    model = AutoModelForCausalLM.from_pretrained(path, token= hf_token) if hf_token else AutoModelForCausalLM.from_pretrained(path)
     return tokenizer, model
