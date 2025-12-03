@@ -4,12 +4,12 @@ import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from src.Constants import SAVE_PATH, DATASET
-from src.LlamaRLTrainer import LlamaRLTrainer
-from src.QuestionDataset import QuestionDataset
-from src.RLConfig import RLConfig
-from src.RougeScore import compare_slm_rouge_scores
-from src.StructureDataset import make_dict, StructureDataset
+from rl_pipeline.Constants import SAVE_PATH, DATASET
+from rl_pipeline.LlamaRLTrainer import LlamaRLTrainer
+from rl_pipeline.QuestionDataset import QuestionDataset
+from rl_pipeline.RLConfig import RLConfig
+from rl_pipeline.RougeScore import compare_slm_rouge_scores
+from rl_pipeline.StructureDataset import make_dict, StructureDataset
 
 
 def query_model(path, question: str, hf_token=None):

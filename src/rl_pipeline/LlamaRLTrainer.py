@@ -8,9 +8,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from src.Constants import SAVE_PATH
-from src.QuestionDataset import QuestionDataset
-from src.RLConfig import RLConfig
+from rl_pipeline.Constants import SAVE_PATH
+from rl_pipeline.QuestionDataset import QuestionDataset
+from rl_pipeline.RLConfig import RLConfig
 
 
 class LlamaRLTrainer:

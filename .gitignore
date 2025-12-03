@@ -1,3 +1,4 @@
 .idea
 .mise.toml
 .venv
+__pycache__/
