@@ -24,14 +24,26 @@ class LlamaRLTrainer:
             config.model_1b_path,
             token=config.hf_token
         )
-        self.tokenizer_8b = self.tokenizer_1b  # Reuse same tokenizer
+        self.tokenizer_8b = AutoTokenizer.from_pretrained(
+            config.model_1b_path,
+            token=config.hf_token
+        )
 
         if self.tokenizer_1b.pad_token is None:
             self.tokenizer_1b.pad_token = self.tokenizer_1b.eos_token
 
+        if self.tokenizer_8b.pad_token is None:
+            self.tokenizer_8b.pad_token = self.tokenizer_1b.eos_token
+
         print("Loading 1B model (trainable)...")
         self.model_1b = AutoModelForCausalLM.from_pretrained(
             config.model_1b_path,
+            torch_dtype=torch.float16,
+            token=config.hf_token
+        )
+
+        self.model_8b = AutoModelForCausalLM.from_pretrained(
+            config.model_8b_path,
             torch_dtype=torch.float16,
             token=config.hf_token
         )

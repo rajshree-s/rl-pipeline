@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class RLConfig:
     """Configuration for RL training - optimized for Colab"""
     model_1b_path: str = "meta-llama/Llama-3.2-1B"
-    model_8b_path: str = "meta-llama/Llama-3.2-1B"  # Same 1B model
+    model_8b_path: str = "meta-llama/Llama-3.2-3B"
     batch_size: int = 1
     learning_rate: float = 1e-5
     num_epochs: int = 1  # Reduce for testing
@@ -18,7 +18,7 @@ class RLConfig:
     value_coef: float = 0.5
     entropy_coef: float = 0.01
     gamma: float = 0.99
-    device: str = "gpu"
-    hf_token: str = None  # Will use Colab Secrets
+    device: str = "mps"
+    hf_token: str = None
     use_lora: bool = True
     use_8bit: bool = False  # Set to True if OOM errors

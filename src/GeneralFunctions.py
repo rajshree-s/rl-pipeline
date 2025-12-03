@@ -44,7 +44,8 @@ def finetune_model():
         num_epochs=1,
         learning_rate=1e-5,
         use_lora=True,
-        num_responses=3
+        num_responses=3,
+        hf_token=os.environ['hf_token']
     )
     trainer = LlamaRLTrainer(config)
     path_ = ("%s" % SAVE_PATH)
@@ -78,7 +79,7 @@ def responses(path):
             old_responses = json.load(f)
     else:
         old_responses = [
-            query_model(RLConfig.model_1b_path, question=data.question, hf_token="")
+            query_model(RLConfig.model_1b_path, question=data.question, hf_token=RLConfig.hf_token)
             for data in test_data]
         with open('old_responses.json', 'w') as f:
             f.write(json.dumps(old_responses))
