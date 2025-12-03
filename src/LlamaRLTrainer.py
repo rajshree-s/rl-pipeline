@@ -48,7 +48,7 @@ class LlamaRLTrainer:
                 bias="none"
             )
             self.model_1b = get_peft_model(self.model_1b, lora_config)
-            self.model_1b = self.model_1b.to(device="mps")
+            self.model_1b = self.model_1b.to(device=RLConfig.device)
             print(f"Trainable params: {sum(p.numel() for p in self.model_1b.parameters() if p.requires_grad):,}")
 
         self.ref_model_1b = None
@@ -72,7 +72,7 @@ class LlamaRLTrainer:
             for param in self.ref_model_1b.parameters():
                 param.requires_grad = False
 
-            self.ref_model_1b = self.ref_model_1b.to(device="mps")
+            self.ref_model_1b = self.ref_model_1b.to(device=RLConfig.device)
         return self.ref_model_1b
 
     def _load_ranker_model(self):
@@ -85,7 +85,7 @@ class LlamaRLTrainer:
             )
             for param in self.model_8b.parameters():
                 param.requires_grad = False
-            self.model_8b = self.model_8b.to(device="mps")
+            self.model_8b = self.model_8b.to(device=RLConfig.device)
         return self.model_8b
 
     def _unload_ranker_model(self):
