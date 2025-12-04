@@ -1,12 +1,25 @@
-from pathlib import Path
-from rl_pipeline.utils import get_project_root
+from datasets import Dataset as HFDataset
 
-from datasets import load_dataset
-
-
-def _get_download_path() -> Path:
-    return get_project_root() / "datasets"
+from .dataset import Dataset
 
 
-def download():
-    load_dataset("stanfordnlp/coqa", cache_dir=_get_download_path().as_uri())
+class CoqaDataset(Dataset):
+    _name = "stanfordnlp/coqa"
+    _splits = ("train", "validation")
+    _promt = ""
+
+    @property
+    def name(self) -> str:
+        return CoqaDataset._name
+
+    @property
+    def splits(self) -> tuple[str, ...]:
+        return CoqaDataset._splits
+
+    @property
+    def prompt(self) -> str:
+        return CoqaDataset._promt
+
+    def _transform_from_raw(self, dataset: HFDataset) -> HFDataset:
+        # TODO
+        return dataset

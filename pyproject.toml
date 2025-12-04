@@ -15,4 +15,4 @@ requires = ["uv_build >= 0.8.17, <0.9.0"]
 build-backend = "uv_build"
 
 [project.scripts]
-download-coqa = "rl_pipeline.datasets.coqa:download"
+download-coqa = "rl_pipeline.datasets.coqa:CoqaDataset.download"
