@@ -4,3 +4,4 @@
 __pycache__/
 /datasets/
 dist/
+.DS_Store
