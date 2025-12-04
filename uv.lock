@@ -1166,23 +1166,17 @@ name = "rl-pipeline"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "datasets" },
     { name = "peft" },
     { name = "rouge-score" },
 ]
 
-[package.dev-dependencies]
-scripts = [
-    { name = "datasets" },
-]
-
 [package.metadata]
 requires-dist = [
+    { name = "datasets", specifier = ">=4.4.1" },
     { name = "peft", specifier = ">=0.18.0" },
     { name = "rouge-score", specifier = ">=0.1.2" },
 ]
-
-[package.metadata.requires-dev]
-scripts = [{ name = "datasets", specifier = ">=4.4.1" }]
 
 [[package]]
 name = "rouge-score"
