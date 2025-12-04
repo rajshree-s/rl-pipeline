@@ -257,8 +257,7 @@ class LlamaRLTrainer:
     def train_step(self, question: str, system_prompt: str, prompt: str):
         """Single training step"""
         responses = self.generate_responses(question, system_prompt, prompt)
-        rankings = self.rank_responses(question, responses)
-        rewards = self.compute_rewards(rankings, len(responses))
+        rewards = self.reward_function(question, responses)
 
         self.optimizer.zero_grad()
         loss = self.compute_ppo_loss(question, responses, rewards, system_prompt, prompt)
@@ -266,7 +265,12 @@ class LlamaRLTrainer:
         torch.nn.utils.clip_grad_norm_(self.model_1b.parameters(), 1.0)
         self.optimizer.step()
 
-        return loss.item(), rankings, responses
+        return loss.item(), responses
+
+    def reward_function(self, question: str, responses: list[str]) -> list[float]:
+        rankings = self.rank_responses(question, responses)
+        rewards = self.compute_rewards(rankings, len(responses))
+        return rewards
 
     def train(self, dataset: QuestionDataset, system_prompt: str,
               save_path: str = "%s" % SAVE_PATH):
@@ -283,23 +287,13 @@ class LlamaRLTrainer:
 
                 for question in questions:
                     try:
-                        loss, rankings, responses = self.train_step(question, system_prompt, para)
+                        loss, responses = self.train_step(question, system_prompt, para)
                         total_loss += loss
 
                         progress_bar.set_postfix({
                             'loss': f'{loss:.4f}',
                             'avg_loss': f'{total_loss / (batch_idx + 1):.4f}'
                         })
-
-                        if True:
-                            print(f"\n{'=' * 60}")
-                            print(f"Question: {questions}")
-                            print(f"\nGenerated Responses:")
-                            for i, resp in enumerate(responses, 1):
-                                rank = rankings.get(f"answer{i}", "?")
-                                print(f"  Answer {i} (Rank {rank}): {resp[:100]}...")
-                            print(f"{'=' * 60}")
-
                     except Exception as e:
                         print(f"Error on question: {questions}")
                         print(f"Error: {e}")
