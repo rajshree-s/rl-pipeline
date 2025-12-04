@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import cast
+
 from rl_pipeline.utils import dataset_cache_dir
 
 from datasets import load_dataset, Dataset as HFDataset
@@ -32,6 +33,7 @@ class Dataset(ABC):
         print(f"Downlaoding dataset '{self.name}'")
         load_dataset(self.name, cache_dir=dataset_cache_dir().as_uri())
 
+
     def load_dataset(self, split: str, no_of_records: int | None = None) -> HFDataset:
         assert self.has_split(split)
         raw_dataset = cast(
@@ -40,7 +42,7 @@ class Dataset(ABC):
                 self.name, cache_dir=dataset_cache_dir().as_uri(), split=split
             ),
         )
-        raw_dataset = raw_dataset[:no_of_records] if no_of_records else raw_dataset
+        raw_dataset = raw_dataset.train_test_split(no_of_records)["test"] if no_of_records else raw_dataset
 
         return self._transform_from_raw(raw_dataset)
 
