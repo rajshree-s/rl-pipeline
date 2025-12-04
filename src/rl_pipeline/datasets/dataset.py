@@ -32,7 +32,7 @@ class Dataset(ABC):
         print(f"Downlaoding dataset '{self.name}'")
         load_dataset(self.name, cache_dir=dataset_cache_dir().as_uri())
 
-    def load_dataset(self, split: str) -> HFDataset:
+    def load_dataset(self, split: str, no_of_records: int | None = None) -> HFDataset:
         assert self.has_split(split)
         raw_dataset = cast(
             HFDataset,
@@ -40,6 +40,8 @@ class Dataset(ABC):
                 self.name, cache_dir=dataset_cache_dir().as_uri(), split=split
             ),
         )
+        raw_dataset = raw_dataset[:no_of_records] if no_of_records else raw_dataset
+
         return self._transform_from_raw(raw_dataset)
 
     def has_split(self, split: str) -> bool:

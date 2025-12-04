@@ -9,7 +9,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from rl_pipeline.Constants import SAVE_PATH
-from rl_pipeline.QuestionDataset import QuestionDataset
+from datasets import Dataset
 from rl_pipeline.RLConfig import RLConfig
 
 
@@ -272,36 +272,32 @@ class LlamaRLTrainer:
         rewards = self.compute_rewards(rankings, len(responses))
         return rewards
 
-    def train(self, dataset: QuestionDataset, system_prompt: str,
-              save_path: str = "%s" % SAVE_PATH):
-        dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    def train(self, dataset: Dataset, system_prompt: str, save_path: str = "%s" % SAVE_PATH):
 
         for epoch in range(self.config.num_epochs):
             print(f"\nEpoch {epoch + 1}/{self.config.num_epochs}")
             total_loss = 0
 
-            progress_bar = tqdm(dataloader, desc="Training")
+            progress_bar = tqdm(dataset, desc="Training")
             for batch_idx, batch in enumerate(progress_bar):
-                questions = batch['questions'][0]
-                para = batch['paragraph'][0]
+                question = batch.prompt
+                para = batch.system_prompt
+                try:
+                    loss, responses = self.train_step(question, system_prompt, para)
+                    total_loss += loss
 
-                for question in questions:
-                    try:
-                        loss, responses = self.train_step(question, system_prompt, para)
-                        total_loss += loss
+                    progress_bar.set_postfix({
+                        'loss': f'{loss:.4f}',
+                        'avg_loss': f'{total_loss / (batch_idx + 1):.4f}'
+                    })
+                except Exception as e:
+                    print(f"Error on question: {question}")
+                    print(f"Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
 
-                        progress_bar.set_postfix({
-                            'loss': f'{loss:.4f}',
-                            'avg_loss': f'{total_loss / (batch_idx + 1):.4f}'
-                        })
-                    except Exception as e:
-                        print(f"Error on question: {questions}")
-                        print(f"Error: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        continue
-
-            avg_loss = total_loss / max(len(dataloader), 1)
+            avg_loss = total_loss / max(len(dataset), 1)
             print(f"Epoch {epoch + 1} Average Loss: {avg_loss:.4f}")
             model_path = f"{save_path}_epoch_{epoch + 1}"
             self.save_model(model_path)

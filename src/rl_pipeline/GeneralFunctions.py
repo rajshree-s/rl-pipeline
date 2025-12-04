@@ -9,7 +9,8 @@ from rl_pipeline.LlamaRLTrainer import LlamaRLTrainer
 from rl_pipeline.QuestionDataset import QuestionDataset
 from rl_pipeline.RLConfig import RLConfig
 from rl_pipeline.RougeScore import compare_slm_rouge_scores
-from rl_pipeline.StructureDataset import make_dict, StructureDataset
+from rl_pipeline.StructureDataset import make_dict
+from rl_pipeline.datasets.coqa import CoqaDataset
 
 
 def query_model(path, question: str, hf_token=None):
@@ -49,8 +50,8 @@ def finetune_model():
     )
     trainer = LlamaRLTrainer(config)
     path_ = ("%s" % SAVE_PATH)
-    questions_para_data = make_dict(StructureDataset(path=DATASET, start=0, end=1).get_questions_with_paragraph())
-    dataset = QuestionDataset(questions_para_data)
+    dataset = CoqaDataset().load_dataset("train", 2)
+
     return trainer.train(
         dataset=dataset,
         system_prompt=f"You are given a paragraph, read and understand it and give answers for given question.",
@@ -64,8 +65,8 @@ def test_model(path):
 
 
 def responses(path):
-    test_data = StructureDataset(DATASET, start=7000, end=7001).get_question_answer_pairs()
-
+    # test_data = StructureDataset(DATASET, start=7000, end=7001).get_question_answer_pairs()
+    test_data = ""
     if os.path.exists('new_responses.json'):
         with open('new_responses.json', 'r') as f:
             new_responses = json.load(f)
