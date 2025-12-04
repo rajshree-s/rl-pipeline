@@ -2,5 +2,5 @@
 .mise.toml
 .venv
 __pycache__/
-datasets/
+/datasets/
 dist/
