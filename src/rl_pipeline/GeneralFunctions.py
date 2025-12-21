@@ -4,12 +4,10 @@ import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from rl_pipeline.Constants import SAVE_PATH, DATASET
+from rl_pipeline.Constants import SAVE_PATH
 from rl_pipeline.LlamaRLTrainer import LlamaRLTrainer
-from rl_pipeline.QuestionDataset import QuestionDataset
 from rl_pipeline.RLConfig import RLConfig
 from rl_pipeline.RougeScore import compare_slm_rouge_scores
-from rl_pipeline.StructureDataset import make_dict
 from rl_pipeline.datasets.coqa import CoqaDataset
 
 
@@ -35,8 +33,10 @@ def query_model(path, question: str, hf_token=None):
 
 
 def load_saved_model(path: str, hf_token=None):
-    tokenizer = AutoTokenizer.from_pretrained(path, token= hf_token) if hf_token else AutoTokenizer.from_pretrained(path)
-    model = AutoModelForCausalLM.from_pretrained(path, token= hf_token) if hf_token else AutoModelForCausalLM.from_pretrained(path)
+    tokenizer = AutoTokenizer.from_pretrained(path, token=hf_token) if hf_token else AutoTokenizer.from_pretrained(path)
+    model = AutoModelForCausalLM.from_pretrained(path,
+                                                 token=hf_token) if hf_token else AutoModelForCausalLM.from_pretrained(
+        path)
     return tokenizer, model
 
 
@@ -61,29 +61,19 @@ def finetune_model():
 
 def test_model(path):
     ground_truth, new_responses, old_responses = responses(path)
-    print(compare_slm_rouge_scores(ground_truth, new_responses, old_responses))
+    if ground_truth !=[] and new_responses !=[] and old_responses !=[]:
+        print(compare_slm_rouge_scores(ground_truth, new_responses, old_responses))
+    else:
+        print("There exists a null value")
 
 
 def responses(path):
-    # test_data = StructureDataset(DATASET, start=7000, end=7001).get_question_answer_pairs()
-    test_data = ""
-    if os.path.exists('new_responses.json'):
-        with open('new_responses.json', 'r') as f:
-            new_responses = json.load(f)
-    else:
-        new_responses = [query_model(path=path, question=data.question) for data in test_data]
-        with open('new_responses.json', 'w') as f:
-            f.write(json.dumps(new_responses))
+    test_data = CoqaDataset().load_dataset(split="validation", no_of_records=2)
+    new_responses = [query_model(path=path, question=data.prompt) for data in test_data]
 
-    if os.path.exists('old_responses.json'):
-        with open('old_responses.json', 'r') as f:
-            old_responses = json.load(f)
-    else:
-        old_responses = [
-            query_model(RLConfig.model_1b_path, question=data.question, hf_token=RLConfig.hf_token)
-            for data in test_data]
-        with open('old_responses.json', 'w') as f:
-            f.write(json.dumps(old_responses))
+    old_responses = [
+        query_model(RLConfig.model_1b_path, question=data.prompt, hf_token=RLConfig.hf_token)
+        for data in test_data]
 
-    ground_truth = [data.answer for data in test_data]
+    ground_truth = [data.expected_response for data in test_data]
     return ground_truth, new_responses, old_responses
