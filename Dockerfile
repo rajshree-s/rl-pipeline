@@ -1,8 +1,8 @@
 FROM python:3.13-bookworm
 
-COPY dist/rl_pipeline-0.1.0-py3-none-any.whl /tmp/rl_pipeline-0.1.0-py3-none-any.whl
+COPY ./dist/rl_pipeline-0.1.0-py3-none-any.whl ./rl_pipeline-0.1.0-py3-none-any.whl
+ENV hf_token=$hf_token
 
-RUN pip install --no-cache-dir /tmp/rl_pipeline-0.1.0-py3-none-any.whl
-RUN cd src/rl_pipeline
+RUN pip install ./rl_pipeline-0.1.0-py3-none-any.whl
 
-CMD ["python", "main.py"]
+CMD ["python", "-m","rl_pipeline.main"]
