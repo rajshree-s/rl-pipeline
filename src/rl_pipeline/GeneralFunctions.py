@@ -46,6 +46,7 @@ def finetune_model():
         learning_rate=1e-5,
         use_lora=True,
         num_responses=3,
+        RLConfig="auto",
         hf_token=os.environ['hf_token']
     )
     trainer = LlamaRLTrainer(config)
