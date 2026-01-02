@@ -1,39 +1,34 @@
 #!/usr/bin/env just --justfile
 export PATH := join(justfile_directory(), ".env", "bin") + ":" + env_var('PATH')
 pem := "rl-finetuning.pem"
-instance := "ec2-user@ec2-13-233-149-76.ap-south-1.compute.amazonaws.com"
-instance_id := "i-0cc51ff5aad674078"
 
 run:
-  uv sync
-  uv run main.py
+    uv sync
+    uv run main.py
 
 upgrade:
-  uv lock --upgrade
+    uv lock --upgrade
 
-build:
-  docker build -t finetune .
-
-save_build_image:
-  docker save finetune:latest | gzip > finetune.tar.gz
+create_wheel:
+    uv build --wheel
 
 instance_setup:
-  scp -i {{pem}} ./instance_setup.sh "{{instance}}"
-  ssh -i {{pem}} {{instance}} "bash ./instance_setup.sh"
+    scp -i {{ pem }} ./instance_setup.sh {{ env_var('instance') }}:~
+    ssh -i {{ pem }} {{ env_var('instance') }} "source ./instance_setup.sh"
 
-push_wheel_instance:
-  scp -i {{pem}} ./dist/rl_pipeline-0.1.0-py3-none-any.whl "{{instance}}:~/"
-
-deploy:
-  scp -i {{pem}} ./finetune.tar.gz "{{instance}}"
+push_wheel_instance: create_wheel
+    scp -i {{ pem }} ./dist/rl_pipeline-0.1.0-py3-none-any.whl {{ env_var('instance') }}:~
 
 ssh:
-  ssh -i {{pem}} {{instance}}
-
-docker_run:
-  docker run --cpu-shares=8 -e hf_token=$hf_token finetune:latest
+    ssh -i {{ pem }} {{ env_var('instance') }}
 
 start_instance:
-  aws ec2 start-instances --instance-ids {{instance_id}}
+    aws ec2 start-instances --instance-ids {{ env_var('instance_id') }}
 
-run_on_instance: build save_build_image deploy
+run_wheel:
+    ssh -i {{ pem }} {{ env_var('instance') }} "python3.13 -m pip install --force-reinstall rl_pipeline-0.1.0-py3-none-any.whl && export hf_token={{ env_var('hf_token') }} && python3.13 -m rl_pipeline.main"
+
+run_on_instance: instance_setup push_wheel_instance run_wheel
+
+deploy_changes: push_wheel_instance run_wheel
+
