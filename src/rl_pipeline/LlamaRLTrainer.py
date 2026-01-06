@@ -39,14 +39,16 @@ class LlamaRLTrainer:
         self.model_1b = AutoModelForCausalLM.from_pretrained(
             config.model_1b_path,
             torch_dtype=torch.float16,
-            token=config.hf_token
+            token=config.hf_token,
         )
 
+        print("Loading 3B model (teacher)...")
         self.model_8b = AutoModelForCausalLM.from_pretrained(
             config.model_8b_path,
             torch_dtype=torch.float16,
-            token=config.hf_token
+            token=config.hf_token,
         )
+        self.model_8b = self.model_8b.to(device=RLConfig.device)
 
         # Add LoRA to 1B for training
         if config.use_lora:
@@ -63,8 +65,8 @@ class LlamaRLTrainer:
             self.model_1b = self.model_1b.to(device=RLConfig.device)
             print(f"Trainable params: {sum(p.numel() for p in self.model_1b.parameters() if p.requires_grad):,}")
 
-        self.ref_model_1b = None
-        self.model_8b = None
+        # self.ref_model_1b = None
+        # self.model_8b = None
 
         self.optimizer = torch.optim.AdamW(
             self.model_1b.parameters(),
@@ -74,18 +76,18 @@ class LlamaRLTrainer:
         print("Initialization complete!")
 
     def _load_reference_model(self):
-        if self.ref_model_1b is None:
+        if self.model_8b is None:
             print("Loading reference 1B model...")
-            self.ref_model_1b = AutoModelForCausalLM.from_pretrained(
-                self.config.model_1b_path,
+            self.model_8b = AutoModelForCausalLM.from_pretrained(
+                self.config.model_8b_path,
                 torch_dtype=torch.float16,
                 token=self.config.hf_token
             )
-            for param in self.ref_model_1b.parameters():
+            for param in self.model_8b.parameters():
                 param.requires_grad = False
 
-            self.ref_model_1b = self.ref_model_1b.to(device=RLConfig.device)
-        return self.ref_model_1b
+            self.model_8b = self.model_8b.to(device=RLConfig.device)
+        return self.model_8b
 
     def _load_ranker_model(self):
         if self.model_8b is None:
@@ -281,6 +283,7 @@ class LlamaRLTrainer:
             progress_bar = tqdm(dataset, desc="Training")
             for batch_idx, batch in enumerate(progress_bar):
                 question = batch.prompt
+                print(f'Here is the question: {question}')
                 para = batch.system_prompt
                 try:
                     loss, responses = self.train_step(question, system_prompt, para)

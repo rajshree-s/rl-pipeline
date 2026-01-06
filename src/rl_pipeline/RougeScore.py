@@ -12,6 +12,7 @@ def compare_slm_rouge_scores(
         raise ValueError("All input lists (references, fine-tuned outputs, old outputs) must have the same length.")
 
     scorer = rouge_scorer.RougeScorer(metrics, use_stemmer=True)
+    print("Loaded the scorer model")
 
     finetuned_scores_sum = {m: 0.0 for m in metrics}
     old_scores_sum = {m: 0.0 for m in metrics}
