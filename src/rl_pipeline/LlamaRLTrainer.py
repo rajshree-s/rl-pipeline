@@ -102,12 +102,12 @@ class LlamaRLTrainer:
             self.model_8b = self.model_8b.to(device=RLConfig.device)
         return self.model_8b
 
-    def _unload_ranker_model(self):
-        """Unload ranker to save memory"""
-        if self.model_8b is not None:
-            del self.model_8b
-            self.model_8b = None
-            torch.cuda.empty_cache()
+    # def _unload_ranker_model(self):
+    #     """Unload ranker to save memory"""
+    #     if self.model_8b is not None:
+    #         del self.model_8b
+    #         self.model_8b = None
+    #         torch.cuda.empty_cache()
 
     def generate_responses(self, question: str, system_prompt: str, prompt: str) -> List[str]:
         """Generate responses from 1B model"""
@@ -175,7 +175,7 @@ class LlamaRLTrainer:
         )
 
         # Unload ranker after use to save memory
-        self._unload_ranker_model()
+        # self._unload_ranker_model()
 
         # Parse rankings
         try:
