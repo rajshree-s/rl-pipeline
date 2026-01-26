@@ -31,10 +31,10 @@ def query_model(path, question: str, hf_token=None):
     return answer
 
 def responses():
-    test_data = CoqaDataset().load_dataset(split="validation", no_of_records=2)
+    test_data = CoqaDataset().load_dataset(split="train", no_of_records=2)
     print(f"Here is the test data: {test_data}")
     old_responses = [query_model(path=RLConfig.model_1b_path,
-                                 question=f"{data.system_prompt} \n\n Paragraph: {data.prompt} \n\nQuestion: {data.question}\n Here are the previously asked questions:{data.context}\n Answer:")
+                                 question=f"{data.system_prompt} \n\nQuestion: {data.prompt}\n Here are the previously asked questions:{data.prev_context}\n Answer:")
                      for data in test_data]
     filename = "old_responses.json"
     save_list_to_file(old_responses, filename)

@@ -36,6 +36,7 @@ class CoqaDataset(Dataset):
                 )
                 results.append(entry)
                 prev_questions.append(q)
+        return results
 
 
 @dataclass

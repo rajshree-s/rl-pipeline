@@ -36,7 +36,7 @@ def responses(path):
     test_data = CoqaDataset().load_dataset(split="validation", no_of_records=2)
     print(f"Here is the test data: {test_data}")
     new_responses = [query_model(path=path,
-                                 question=f"{data.system_prompt} \n\n Paragraph: {data.prompt} \n\nQuestion: {data.question}\n Here are the previously asked questions:{data.context}\n Answer:")
+                                 question=f"{data.system_prompt} \n\nQuestion: {data.prompt}\n Here are the previously asked questions:{data.prev_context}\n Answer:")
                      for data in test_data]
     filename = "new_responses.json"
     save_list_to_file(new_responses, filename)
@@ -47,4 +47,5 @@ def responses(path):
 
 if __name__ == '__main__':
     path = sys.argv[1]
+    # path = "sys.argve[1]"
     responses(path)
