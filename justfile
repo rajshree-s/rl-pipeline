@@ -3,7 +3,6 @@ export PATH := join(justfile_directory(), ".env", "bin") + ":" + env_var('PATH')
 pem := "rl-finetuning.pem"
 
 run:
-    uv sync
     uv run main.py
 
 upgrade:

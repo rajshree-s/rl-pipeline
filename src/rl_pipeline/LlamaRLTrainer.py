@@ -4,7 +4,6 @@ from typing import List, Dict
 import torch
 from peft import LoraConfig, get_peft_model
 from torch.nn import functional as F
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
@@ -25,7 +24,7 @@ class LlamaRLTrainer:
             token=config.hf_token
         )
         self.tokenizer_8b = AutoTokenizer.from_pretrained(
-            config.model_1b_path,
+            config.model_8b_path,
             token=config.hf_token
         )
 
@@ -33,7 +32,7 @@ class LlamaRLTrainer:
             self.tokenizer_1b.pad_token = self.tokenizer_1b.eos_token
 
         if self.tokenizer_8b.pad_token is None:
-            self.tokenizer_8b.pad_token = self.tokenizer_1b.eos_token
+            self.tokenizer_8b.pad_token = self.tokenizer_8b.eos_token
 
         print("Loading 1B model (trainable)...")
         self.model_1b = AutoModelForCausalLM.from_pretrained(
@@ -64,9 +63,6 @@ class LlamaRLTrainer:
             self.model_1b = get_peft_model(self.model_1b, lora_config)
             self.model_1b = self.model_1b.to(device=RLConfig.device)
             print(f"Trainable params: {sum(p.numel() for p in self.model_1b.parameters() if p.requires_grad):,}")
-
-        # self.ref_model_1b = None
-        # self.model_8b = None
 
         self.optimizer = torch.optim.AdamW(
             self.model_1b.parameters(),
@@ -102,16 +98,9 @@ class LlamaRLTrainer:
             self.model_8b = self.model_8b.to(device=RLConfig.device)
         return self.model_8b
 
-    # def _unload_ranker_model(self):
-    #     """Unload ranker to save memory"""
-    #     if self.model_8b is not None:
-    #         del self.model_8b
-    #         self.model_8b = None
-    #         torch.cuda.empty_cache()
-
-    def generate_responses(self, question: str, system_prompt: str, prompt: str) -> List[str]:
+    def generate_responses(self, question: str, system_prompt: str, prompt: str, context: str) -> List[str]:
         """Generate responses from 1B model"""
-        prompt = f"{system_prompt} \n\n Paragraph: {prompt} \n\nQuestion: {question}\nAnswer:"
+        prompt = f"{system_prompt} \n\n Paragraph: {prompt} \n\nQuestion: {question}\n Here are the previously asked questions:{context}\n Answer:"
 
         inputs = self.tokenizer_1b(
             prompt,
@@ -173,10 +162,6 @@ class LlamaRLTrainer:
             outputs[0][inputs['input_ids'].shape[1]:],
             skip_special_tokens=True
         )
-
-        # Unload ranker after use to save memory
-        # self._unload_ranker_model()
-
         # Parse rankings
         try:
             start = ranking_text.find('{')
@@ -256,9 +241,9 @@ class LlamaRLTrainer:
 
         return total_loss / len(responses)
 
-    def train_step(self, question: str, system_prompt: str, prompt: str):
+    def train_step(self, question: str, system_prompt: str, prompt: str, prev_context: str):
         """Single training step"""
-        responses = self.generate_responses(question, system_prompt, prompt)
+        responses = self.generate_responses(question, system_prompt, prompt, prev_context)
         rewards = self.reward_function(question, responses)
 
         self.optimizer.zero_grad()
@@ -285,8 +270,9 @@ class LlamaRLTrainer:
                 question = batch.prompt
                 print(f'Here is the question: {question}')
                 para = batch.system_prompt
+                prev_context = batch.prev_context
                 try:
-                    loss, responses = self.train_step(question, system_prompt, para)
+                    loss, responses = self.train_step(question, system_prompt, para, prev_context)
                     total_loss += loss
 
                     progress_bar.set_postfix({
@@ -304,7 +290,6 @@ class LlamaRLTrainer:
             print(f"Epoch {epoch + 1} Average Loss: {avg_loss:.4f}")
             model_path = f"{save_path}_epoch_{epoch + 1}"
             self.save_model(model_path)
-
 
         print("\nTraining complete!")
         return model_path
