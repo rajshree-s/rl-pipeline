@@ -1,7 +1,7 @@
-import json
 from typing import List, Dict
 
 import torch
+from bert_score import score as bert_score_func
 from peft import LoraConfig, get_peft_model
 from torch.nn import functional as F
 from tqdm import tqdm
@@ -41,7 +41,7 @@ class LlamaRLTrainer:
             token=config.hf_token,
         )
 
-        print("Loading 3B model (teacher)...")
+        print("Loading 8B model (teacher)...")
         self.model_8b = AutoModelForCausalLM.from_pretrained(
             config.model_8b_path,
             torch_dtype=torch.float16,
@@ -49,10 +49,8 @@ class LlamaRLTrainer:
         )
         self.model_8b = self.model_8b.to(device=RLConfig.device)
 
-        # Add LoRA to 1B for training
         if config.use_lora:
-            print("Adding "
-                  "LoRA to 1B model...")
+            print("Adding LoRA to 1B model...")
             lora_config = LoraConfig(
                 r=16,
                 lora_alpha=16,
@@ -73,7 +71,7 @@ class LlamaRLTrainer:
 
     def _load_reference_model(self):
         if self.model_8b is None:
-            print("Loading reference 1B model...")
+            print("Loading reference 8B model...")
             self.model_8b = AutoModelForCausalLM.from_pretrained(
                 self.config.model_8b_path,
                 torch_dtype=torch.float16,
@@ -85,18 +83,32 @@ class LlamaRLTrainer:
             self.model_8b = self.model_8b.to(device=RLConfig.device)
         return self.model_8b
 
-    def _load_ranker_model(self):
-        if self.model_8b is None:
-            print("Loading ranker 1B model...")
-            self.model_8b = AutoModelForCausalLM.from_pretrained(
-                self.config.model_8b_path,
-                torch_dtype=torch.float16,
-                token=self.config.hf_token
+    def _generate_teacher_response(self, question: str, system_prompt: str, prompt: str, context: str) -> str:
+        """Generate a single response from the 8B teacher model"""
+        prompt_text = f"{system_prompt} \n\n Paragraph: {prompt} \n\nQuestion: {question}\n Here are the previously asked questions:{context}\n Answer:"
+
+        inputs = self.tokenizer_8b(
+            prompt_text,
+            return_tensors="pt",
+            truncation=True,
+            max_length=self.config.max_length
+        ).to(self.config.device)
+
+        with torch.no_grad():
+            outputs = self.model_8b.generate(
+                **inputs,
+                max_new_tokens=128,
+                temperature=0.4,
+                top_p=self.config.top_p,
+                do_sample=True,
+                pad_token_id=self.tokenizer_8b.pad_token_id
             )
-            for param in self.model_8b.parameters():
-                param.requires_grad = False
-            self.model_8b = self.model_8b.to(device=RLConfig.device)
-        return self.model_8b
+
+        response = self.tokenizer_8b.decode(
+            outputs[0][inputs['input_ids'].shape[1]:],
+            skip_special_tokens=True
+        )
+        return response.strip()
 
     def generate_responses(self, question: str, system_prompt: str, prompt: str, context: str) -> List[str]:
         """Generate responses from 1B model"""
@@ -110,6 +122,7 @@ class LlamaRLTrainer:
         ).to(self.config.device)
 
         responses = []
+        # In this setup, we typically generate one response at a time
         for _ in range(self.config.num_responses):
             with torch.no_grad():
                 outputs = self.model_1b.generate(
@@ -129,125 +142,52 @@ class LlamaRLTrainer:
 
         return responses
 
-    def rank_responses(self, question: str, responses: List[str]) -> Dict[str, int]:
-        """Use ranker model to rank responses"""
-        ranker = self._load_ranker_model()
-
-        ranking_prompt = f"""Rank these answers to the question from best (1) to worst ({len(responses)}).
-
-            Question: {question}
-            
-            Answer 1: {responses[0]}
-            Answer 2: {responses[1]}
-            
-            Provide rankings in JSON format: {{"answer1": <rank>, "answer2": <rank>}}"""
-
-        inputs = self.tokenizer_8b(
-            ranking_prompt,
-            return_tensors="pt",
-            truncation=True,
-            max_length=self.config.max_length
-        ).to(self.config.device)
-
-        with torch.no_grad():
-            outputs = ranker.generate(
-                **inputs,
-                max_new_tokens=50,
-                temperature=0.3,
-                do_sample=False,
-                pad_token_id=self.tokenizer_8b.pad_token_id
-            )
-
-        ranking_text = self.tokenizer_8b.decode(
-            outputs[0][inputs['input_ids'].shape[1]:],
-            skip_special_tokens=True
-        )
-        # Parse rankings
-        try:
-            start = ranking_text.find('{')
-            end = ranking_text.rfind('}') + 1
-            if start != -1 and end != 0:
-                json_str = ranking_text[start:end]
-                rankings = json.loads(json_str)
-            else:
-                rankings = {f"answer{i + 1}": i + 1 for i in range(len(responses))}
-        except:
-            rankings = {f"answer{i + 1}": i + 1 for i in range(len(responses))}
-
-        return rankings
-
-    def compute_rewards(self, rankings: Dict[str, int], num_responses: int) -> List[float]:
-        """Convert rankings to rewards"""
-        rewards = []
-        for i in range(1, num_responses + 1):
-            rank = rankings.get(f"answer{i}", i)
-            reward = 1.0 - (rank - 1) / num_responses
-            rewards.append(reward)
-        return rewards
-
-    def compute_ppo_loss(
+    def compute_reinforce_loss(
             self,
             question: str,
             responses: List[str],
-            rewards: torch.Tensor,
             system_prompt: str,
-            prompt: str
+            prompt: str,
+            prev_context: str
     ) -> torch.Tensor:
-        """Compute PPO loss for training"""
-        ref_model = self._load_reference_model()
-        prompt = f"{system_prompt}\n\n Paragraph: {prompt}\n\nQuestion: {question}\nAnswer:"
+        student_response = responses[0]
+        teacher_response = self._generate_teacher_response(question, system_prompt, prompt, prev_context)
+        _, _, f1 = bert_score_func([student_response], [teacher_response], lang="en", model_type='bert-base-uncased', device=self.config.device)
+        reward = f1.squeeze()
 
-        total_loss = 0
-        for idx, (response, reward) in enumerate(zip(responses, rewards)):
-            full_text = prompt + response
+        prompt_text = f"{system_prompt}\n\n Paragraph: {prompt}\n\nQuestion: {question}\nHere are the previously asked questions:{prev_context}\n Answer:"
+        full_text = prompt_text + student_response
 
-            inputs = self.tokenizer_1b(
-                full_text,
-                return_tensors="pt",
-                truncation=True,
-                max_length=self.config.max_length
-            ).to(self.config.device)
+        inputs = self.tokenizer_1b(
+            full_text,
+            return_tensors="pt",
+            truncation=True,
+            max_length=self.config.max_length,
+            padding=True,
+        ).to(self.config.device)
 
-            outputs = self.model_1b(**inputs)
-            logits = outputs.logits
+        outputs = self.model_1b(**inputs)
+        logits = outputs.logits
+        log_probs = F.log_softmax(logits[:, :-1, :], dim=-1)
 
-            with torch.no_grad():
-                ref_outputs = ref_model(**inputs)
-                ref_logits = ref_outputs.logits
+        prompt_tokens_ids = self.tokenizer_1b(prompt_text, return_tensors="pt", padding=True).to(self.config.device)['input_ids']
+        prompt_length = prompt_tokens_ids.shape[1]
+        
+        target_tokens = inputs['input_ids'][:, 1:]
 
-            log_probs = F.log_softmax(logits[:, :-1, :], dim=-1)
-            ref_log_probs = F.log_softmax(ref_logits[:, :-1, :], dim=-1)
+        response_log_probs = log_probs[:, prompt_length - 1:, :]
+        response_target_tokens = target_tokens[:, prompt_length - 1:]
 
-            target_tokens = inputs['input_ids'][:, 1:]
-            selected_log_probs = log_probs.gather(2, target_tokens.unsqueeze(-1)).squeeze(-1)
-            ref_selected_log_probs = ref_log_probs.gather(2, target_tokens.unsqueeze(-1)).squeeze(-1)
-
-            ratio = torch.exp(selected_log_probs - ref_selected_log_probs)
-            advantage = torch.tensor(reward, dtype=torch.float32, device=self.config.device)
-            clipped_ratio = torch.clamp(
-                ratio,
-                1 - self.config.clip_epsilon,
-                1 + self.config.clip_epsilon
-            )
-
-            policy_loss = -torch.min(
-                ratio * advantage,
-                clipped_ratio * advantage
-            ).mean()
-
-            entropy = -(log_probs.exp() * log_probs).sum(-1).mean()
-            loss = policy_loss - self.config.entropy_coef * entropy
-            total_loss += loss
-
-        return total_loss / len(responses)
+        selected_log_probs = response_log_probs.gather(2, response_target_tokens.unsqueeze(-1)).squeeze(-1)
+        loss = -selected_log_probs.sum() * torch.clamp(reward, min=0.0)
+        return loss
 
     def train_step(self, question: str, system_prompt: str, prompt: str, prev_context: str):
-        """Single training step"""
+        self.config.num_responses = 1
         responses = self.generate_responses(question, system_prompt, prompt, prev_context)
-        rewards = self.reward_function(question, responses)
 
         self.optimizer.zero_grad()
-        loss = self.compute_ppo_loss(question, responses, rewards, system_prompt, prompt)
+        loss = self.compute_reinforce_loss(question, responses, system_prompt, prompt, prev_context)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model_1b.parameters(), 1.0)
         self.optimizer.step()

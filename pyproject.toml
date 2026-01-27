@@ -8,6 +8,7 @@ dependencies = [
   "peft>=0.18.0",
   "rouge-score>=0.1.2",
   "datasets>=4.4.1",
+  "bert-score>=0.3.13",
 ]
 
 [build-system]

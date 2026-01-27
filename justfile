@@ -27,6 +27,7 @@ start_instance:
 run_wheel: push_wheel_instance
     ssh -i {{ pem }} {{ env_var('instance') }} "python3.13 -m pip install --force-reinstall rl_pipeline-0.1.0-py3-none-any.whl && export hf_token={{ env_var('hf_token') }} && python3.13 -m rl_pipeline.main"
 
+# Use this command if you have got a fresh instance and want to run from start
 run_on_instance: instance_setup push_wheel_instance run_wheel
 
 deploy_changes: push_wheel_instance run_wheel

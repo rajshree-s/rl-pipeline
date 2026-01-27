@@ -49,7 +49,7 @@ def finetune_model():
     )
     trainer = LlamaRLTrainer(config)
     path_ = ("%s" % SAVE_PATH)
-    dataset = CoqaDataset().load_dataset("train", 2)
+    dataset = CoqaDataset().load_dataset("train")
     print("Dataset loaded Successfully")
 
     return trainer.train(
