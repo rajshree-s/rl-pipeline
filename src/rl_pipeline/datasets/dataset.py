@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import cast
 
-from rl_pipeline.utils import dataset_cache_dir
-
 from datasets import load_dataset, Dataset as HFDataset
+from rl_pipeline.utils import dataset_cache_dir
 
 
 class Dataset(ABC):

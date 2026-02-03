@@ -12,3 +12,17 @@ sudo dnf config-manager --add-repo https://developer.download.nvidia.com/compute
 sudo dnf clean expire-cache
 sudo dnf module enable -y nvidia-driver:open-dkms
 sudo dnf install -y nvidia-open
+
+
+
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+echo >> /root/.bashrc
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv bash)"' >> /root/.bashrc
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv bash)"
+brew install uv
+uv venv --python 3.13 .venv
+source .venv/bin/activate
+uv pip install rl_pipeline-0.1.0-py3-none-any.whl
+
+uv pip install "huggingface_hub[cli]"
+hf auth login

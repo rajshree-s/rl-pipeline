@@ -9,6 +9,7 @@ dependencies = [
   "rouge-score>=0.1.2",
   "datasets>=4.4.1",
   "bert-score>=0.3.13",
+  "pipelines>=0.0.1",
 ]
 
 [build-system]

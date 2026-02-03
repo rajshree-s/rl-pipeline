@@ -1175,6 +1175,12 @@ wheels = [
 ]
 
 [[package]]
+name = "pipelines"
+version = "0.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cc/b8/9fa3242773c00285e077875839059103132d93e407e61f111d26cc856b6b/pipelines-0.0.1.tar.gz", hash = "sha256:5f659bb38af6950d1930b9cecc332eca33ef3ad17f081db1e0cd0386ef1538a5", size = 8743, upload-time = "2016-05-13T10:33:34.878Z" }
+
+[[package]]
 name = "propcache"
 version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1458,6 +1464,7 @@ dependencies = [
     { name = "bert-score" },
     { name = "datasets" },
     { name = "peft" },
+    { name = "pipelines" },
     { name = "rouge-score" },
 ]
 
@@ -1466,6 +1473,7 @@ requires-dist = [
     { name = "bert-score", specifier = ">=0.3.13" },
     { name = "datasets", specifier = ">=4.4.1" },
     { name = "peft", specifier = ">=0.18.0" },
+    { name = "pipelines", specifier = ">=0.0.1" },
     { name = "rouge-score", specifier = ">=0.1.2" },
 ]
 
