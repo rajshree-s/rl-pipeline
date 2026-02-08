@@ -11,14 +11,7 @@ from transformers import pipeline
 from rl_pipeline.datasets.coqa import CoqaDataset
 
 
-def query_model(system:str, user:str) -> str:
-    model_id = "meta-llama/Llama-3.2-1B-Instruct"
-    pipe = pipeline(
-        "text-generation",
-        model=model_id,
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
-    )
+def query_model(pipe, system:str, user:str) -> str:
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
@@ -50,13 +43,18 @@ def calculate_rouge(model_answer, ground_truth):
 
 def responses() -> float:
     test_data = CoqaDataset().load_dataset(split="validation")
+
     similarity_score = 0
     similarity_score_rouge = 0
     count = 0
+
+    pipe = load_pipe(model_id = "meta-llama/Llama-3.2-1B-Instruct")
+
     for data in test_data:
         prompt = f"{data.system_prompt} \n Here are the previously asked questions:{data.prev_context}\n"
         question = f"{data.prompt}"
         model_answer = query_model(
+            pipe=pipe,
             system=prompt,
             user=question
         )
@@ -67,6 +65,15 @@ def responses() -> float:
         logging.info("Similarity Score So far: %s", similarity_score/count)
         logging.info("Similarity Rouge Score So far: %s", similarity_score_rouge/count)
     return similarity_score / count
+
+
+def load_pipe(model_id):
+    return pipeline(
+        "text-generation",
+        model=model_id,
+        torch_dtype=torch.bfloat16,
+        device_map="auto",
+    )
 
 
 if __name__ == '__main__':
