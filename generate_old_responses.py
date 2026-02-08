@@ -11,10 +11,10 @@ from transformers import pipeline
 from rl_pipeline.datasets.coqa import CoqaDataset
 
 
-def query_model(pipe, system:str, user:str) -> str:
+def query_model(pipe, system_prompt: str, question: str) -> str:
     messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": question},
     ]
     outputs = pipe(messages)
     return outputs[0]["generated_text"][-1]['content']
@@ -48,22 +48,22 @@ def responses() -> float:
     similarity_score_rouge = 0
     count = 0
 
-    pipe = load_pipe(model_id = "meta-llama/Llama-3.2-1B-Instruct")
+    pipe = load_pipe(model_id="meta-llama/Llama-3.2-1B-Instruct")
 
     for data in test_data:
         prompt = f"{data.system_prompt} \n Here are the previously asked questions:{data.prev_context}\n"
         question = f"{data.prompt}"
         model_answer = query_model(
             pipe=pipe,
-            system=prompt,
-            user=question
+            system_prompt=prompt,
+            question=question
         )
         ground_truth = data.expected_response
         similarity_score += get_bertscore_diff(model_answer, ground_truth)
         similarity_score_rouge += calculate_rouge(model_answer, ground_truth)
         count += 1
-        logging.info("Similarity Score So far: %s", similarity_score/count)
-        logging.info("Similarity Rouge Score So far: %s", similarity_score_rouge/count)
+        logging.info("Similarity Score So far: %s", similarity_score / count)
+        logging.info("Similarity Rouge Score So far: %s", similarity_score_rouge / count)
     return similarity_score / count
 
 
