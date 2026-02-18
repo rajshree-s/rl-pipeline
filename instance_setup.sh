@@ -14,7 +14,7 @@ sudo dnf module enable -y nvidia-driver:open-dkms
 sudo dnf install -y nvidia-open
 
 
-
+# Runpod setup
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 echo >> /root/.bashrc
 echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv bash)"' >> /root/.bashrc
@@ -26,3 +26,5 @@ uv pip install rl_pipeline-0.1.0-py3-none-any.whl
 
 uv pip install "huggingface_hub[cli]"
 hf auth login
+
+cat output1.log | grep "Similarity Rouge Score So far" | wc -l

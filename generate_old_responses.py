@@ -80,5 +80,5 @@ if __name__ == '__main__':
     score_value = responses()
     logging.info("Final score value: %s", score_value)
     output_data = {"score": score_value}
-    with open("output.json", "w") as f:
+    with open("output1.json", "w") as f:
         json.dump(output_data, f, indent=4)
