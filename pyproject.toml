@@ -10,6 +10,7 @@ dependencies = [
   "datasets>=4.4.1",
   "bert-score>=0.3.13",
   "pipelines>=0.0.1",
+  "sentence-transformers>=5.2.3",
 ]
 
 [build-system]

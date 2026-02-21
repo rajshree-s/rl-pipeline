@@ -1,5 +1,6 @@
 import json
 import logging
+from sentence_transformers import SentenceTransformer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -9,6 +10,8 @@ from rouge_score import rouge_scorer
 from transformers import pipeline
 
 from rl_pipeline.datasets.coqa import CoqaDataset
+
+embeddings_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
 
 def query_model(pipe, system_prompt: str, question: str) -> str:
@@ -40,6 +43,12 @@ def calculate_rouge(model_answer, ground_truth):
 
     return scores['rougeL'].fmeasure
 
+def get_exact_embeddings_score(sentence1: str, sentence2:str):
+    embedding1 = embeddings_model.encode(sentence1, convert_to_numpy=True)
+    embedding2 = embeddings_model.encode(sentence2, convert_to_numpy=True)
+
+    return abs(embedding2 - embedding1)
+
 
 def responses() -> float:
     test_data = CoqaDataset().load_dataset(split="validation", no_of_records=10)
@@ -48,7 +57,7 @@ def responses() -> float:
     similarity_score_rouge = 0
     count = 0
 
-    pipe = load_pipe(model_id="meta-llama/Meta-Llama-3-8B-Instruct")
+    pipe = load_pipe(model_id="meta-llama/Llama-3.2-1B-Instruct")
     with open("Insights.json", "w") as f:
         for data in test_data:
             prompt = f"{data.system_prompt} \n Here are the previously asked questions:{data.prev_context}\n"
@@ -59,17 +68,16 @@ def responses() -> float:
                 question=question
             )
             ground_truth = data.expected_response
-            similarity_score = get_bertscore_diff(model_answer, ground_truth)['similarity_f1']
-            difference = get_bertscore_diff(model_answer, ground_truth)['difference']
-            total_score += similarity_score
-            similarity_score_rouge += calculate_rouge(model_answer, ground_truth)
+            # bert_score = get_bertscore_diff(model_answer, ground_truth)
+            # similarity_score = bert_score['similarity_f1']
+            # difference = bert_score['difference']
+            # total_score += similarity_score
+            # similarity_score_rouge += calculate_rouge(model_answer, ground_truth)
+            embedding_score = get_exact_embeddings_score(model_answer, ground_truth)
+            total_score +=embedding_score
             count += 1
-            logging.info("Difference: %s", difference)
-            logging.info("Question %s", count)
-            logging.info("Similarity Score So far: %s", total_score / count)
-            logging.info("Similarity Rouge Score So far: %s", similarity_score_rouge / count)
-            json.dump({"Question no": count, "difference": difference}, f, indent=4)
-            logging.info("===========")
+            # json.dump({"Question no": count, "difference": difference}, f, indent=4)
+            json.dump({"Question no": count, "Embedding Score":embedding_score}, f, indent=4)
         return total_score / count
 
 

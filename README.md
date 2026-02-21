@@ -5,7 +5,7 @@ Run the finetuning pipeline: `just run`
 # Benchmark Scores
 - `1B`: 0.835273989136995 `meta-llama/Llama-3.2-1B-Instruct`
 - `3B`: 0.8572563705583769 `meta-llama/Llama-3.2-3B-Instruct`
-- `8B`: 0.8534518351496928
+- `8B`: 0.8534518351496928 `meta-llama/Meta-Llama-3-8B-Instruct`
 
 
 ## Error Analysis
