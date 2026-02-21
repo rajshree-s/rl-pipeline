@@ -30,7 +30,7 @@ def get_bertscore_diff(candidate, reference):
     return {
         "similarity_f1": round(similarity, 4),
         "difference": round(difference, 4)
-    }['similarity_f1']
+    }
 
 
 def calculate_rouge(model_answer, ground_truth):
@@ -42,29 +42,35 @@ def calculate_rouge(model_answer, ground_truth):
 
 
 def responses() -> float:
-    test_data = CoqaDataset().load_dataset(split="validation")
+    test_data = CoqaDataset().load_dataset(split="validation", no_of_records=10)
 
-    similarity_score = 0
+    total_score = 0
     similarity_score_rouge = 0
     count = 0
 
-    pipe = load_pipe(model_id="meta-llama/Llama-3.2-1B-Instruct")
-
-    for data in test_data:
-        prompt = f"{data.system_prompt} \n Here are the previously asked questions:{data.prev_context}\n"
-        question = f"{data.prompt}"
-        model_answer = query_model(
-            pipe=pipe,
-            system_prompt=prompt,
-            question=question
-        )
-        ground_truth = data.expected_response
-        similarity_score += get_bertscore_diff(model_answer, ground_truth)
-        similarity_score_rouge += calculate_rouge(model_answer, ground_truth)
-        count += 1
-        logging.info("Similarity Score So far: %s", similarity_score / count)
-        logging.info("Similarity Rouge Score So far: %s", similarity_score_rouge / count)
-    return similarity_score / count
+    pipe = load_pipe(model_id="meta-llama/Meta-Llama-3-8B-Instruct")
+    with open("Insights.json", "w") as f:
+        for data in test_data:
+            prompt = f"{data.system_prompt} \n Here are the previously asked questions:{data.prev_context}\n"
+            question = f"{data.prompt}"
+            model_answer = query_model(
+                pipe=pipe,
+                system_prompt=prompt,
+                question=question
+            )
+            ground_truth = data.expected_response
+            similarity_score = get_bertscore_diff(model_answer, ground_truth)['similarity_f1']
+            difference = get_bertscore_diff(model_answer, ground_truth)['difference']
+            total_score += similarity_score
+            similarity_score_rouge += calculate_rouge(model_answer, ground_truth)
+            count += 1
+            logging.info("Difference: %s", difference)
+            logging.info("Question %s", count)
+            logging.info("Similarity Score So far: %s", total_score / count)
+            logging.info("Similarity Rouge Score So far: %s", similarity_score_rouge / count)
+            json.dump({"Question no": count, "difference": difference}, f, indent=4)
+            logging.info("===========")
+        return total_score / count
 
 
 def load_pipe(model_id):
