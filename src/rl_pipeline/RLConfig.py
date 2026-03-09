@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 @dataclass
 class RLConfig:
-    """Configuration for RL training - optimized for Colab"""
     model_1b_path: str = "meta-llama/Llama-3.2-1B"
     model_8b_path: str = "meta-llama/Llama-3.2-3B"
     batch_size: int = 1

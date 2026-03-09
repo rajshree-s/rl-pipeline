@@ -110,37 +110,28 @@ class LlamaRLTrainer:
         )
         return response.strip()
 
-    def generate_responses(self, question: str, system_prompt: str, prompt: str, context: str) -> List[str]:
-        """Generate responses from 1B model"""
-        prompt = f"{system_prompt} \n\n Paragraph: {prompt} \n\nQuestion: {question}\n Here are the previously asked questions:{context}\n Answer:"
+    def get_slm_response(self, question: str, prompt: str, context: str) -> List[str]:
+        prompt = f"Read the following paragraph and answer the question concisely. Only provide the answer. \n\n Paragraph: {prompt} \n\n Just for context you have answered previously these questions:{context} \n Question: {question}\n  Answer:"
+
 
         inputs = self.tokenizer_1b(
             prompt,
             return_tensors="pt",
-            truncation=True,
-            max_length=self.config.max_length
         ).to(self.config.device)
 
-        responses = []
-        # In this setup, we typically generate one response at a time
-        for _ in range(self.config.num_responses):
-            with torch.no_grad():
-                outputs = self.model_1b.generate(
-                    **inputs,
-                    max_new_tokens=128,
-                    temperature=self.config.temperature,
-                    top_p=self.config.top_p,
-                    do_sample=True,
-                    pad_token_id=self.tokenizer_1b.pad_token_id
-                )
+        with torch.no_grad():
+            outputs = self.model_1b.generate(
+                **inputs,
+                max_new_tokens=128,
+                pad_token_id=self.tokenizer_1b.pad_token_id
+            )
 
             response = self.tokenizer_1b.decode(
                 outputs[0][inputs['input_ids'].shape[1]:],
                 skip_special_tokens=True
             )
-            responses.append(response.strip())
 
-        return responses
+        return response
 
     def compute_reinforce_loss(
             self,
@@ -184,7 +175,7 @@ class LlamaRLTrainer:
 
     def train_step(self, question: str, system_prompt: str, prompt: str, prev_context: str):
         self.config.num_responses = 1
-        responses = self.generate_responses(question, system_prompt, prompt, prev_context)
+        responses = self.get_slm_response(question, prompt, prev_context)
 
         self.optimizer.zero_grad()
         loss = self.compute_reinforce_loss(question, responses, system_prompt, prompt, prev_context)

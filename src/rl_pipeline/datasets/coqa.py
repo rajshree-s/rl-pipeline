@@ -31,7 +31,7 @@ class CoqaDataset(Dataset):
                 entry = DatasetEntry(
                     prompt=q,
                     prev_context="\n".join(prev_questions),
-                    system_prompt=f"You are expert in reading comprehension task and here is your para: {story}",
+                    system_prompt=f"{story}",
                     expected_response=a
                 )
                 results.append(entry)
