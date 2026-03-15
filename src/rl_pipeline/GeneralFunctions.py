@@ -1,4 +1,8 @@
+import json
 import logging
+import os
+from typing import Any
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
@@ -7,8 +11,6 @@ from rl_pipeline.LlamaRLTrainer import LlamaRLTrainer
 from rl_pipeline.RLConfig import RLConfig
 from rl_pipeline.RougeScore import compare_slm_rouge_scores
 from rl_pipeline.datasets.coqa import CoqaDataset
-import json
-import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -63,6 +65,44 @@ def finetune_model():
     )
 
 
+def get_response_for(
+        device_to_load: str,
+        model: Any,
+        tokenizer: Any,
+        current_question: str,
+        system_prompt: str,
+        comprehension: str,
+        previously_answered_questions: str
+) -> str:
+    chat_prompt = get_prompt_template(comprehension, current_question, previously_answered_questions, system_prompt,
+                                      tokenizer)
+
+    inputs = tokenizer(chat_prompt, return_tensors="pt").to(device_to_load)
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=128,
+        num_return_sequences=1
+    )
+    response = tokenizer.decode(
+        outputs[0][inputs['input_ids'].shape[1]:],
+        skip_special_tokens=True
+    )
+
+    return response
+
+
+def get_prompt_template(comprehension, current_question, previously_answered_questions, system_prompt, tokenizer):
+    final_prompt = (f" \n\n Paragraph: {comprehension} \n\n Just for context you have answered previously"
+                    f" these questions:{previously_answered_questions} \n Here is a new question: {current_question}\n"
+                    f" Answer:")
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": final_prompt},
+    ]
+    chat_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    return chat_prompt
+
+
 def test_model(path):
     ground_truth, new_responses, old_responses = responses(path)
     logger.info("testing_model")
@@ -104,6 +144,7 @@ def get_responses(test_data, path, filename):
     logger.info("using the saved responses")
     return load_list_from_file(filename)
 
+
 def save_list_to_file(data_list, filename):
     try:
         with open(filename, 'w') as f:
@@ -113,6 +154,7 @@ def save_list_to_file(data_list, filename):
     except Exception as e:
         logger.error(f"Failed to save {filename}: {e}")
         return False
+
 
 def responses(path):
     test_data = CoqaDataset().load_dataset(split="validation", no_of_records=2)

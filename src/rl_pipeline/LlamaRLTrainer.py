@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 import torch
 from bert_score import score as bert_score_func
@@ -10,6 +9,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from rl_pipeline.Constants import SAVE_PATH
+from rl_pipeline.GeneralFunctions import get_response_for
 from rl_pipeline.RLConfig import RLConfig
 
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class LlamaRLTrainer:
-    """RL Trainer with sequential model loading for memory efficiency"""
 
     def __init__(self, config: RLConfig):
         self.config = config
@@ -73,82 +72,17 @@ class LlamaRLTrainer:
 
         logger.info("Initialization complete!")
 
-    def _load_reference_model(self):
-        if self.model_8b is None:
-            logger.info("Loading reference 8B model...")
-            self.model_8b = AutoModelForCausalLM.from_pretrained(
-                self.config.model_8b_path,
-                torch_dtype=torch.float16,
-                token=self.config.hf_token
-            )
-            for param in self.model_8b.parameters():
-                param.requires_grad = False
-
-            self.model_8b = self.model_8b.to(device=RLConfig.device)
-        return self.model_8b
-
-    def _generate_teacher_response(self, question: str, system_prompt: str, prompt: str, context: str) -> str:
-        """Generate a single response from the 8B teacher model"""
-        prompt_text = f"{system_prompt} \n\n Paragraph: {prompt} \n\nQuestion: {question}\n Here are the previously asked questions:{context}\n Answer:"
-
-        inputs = self.tokenizer_8b(
-            prompt_text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=self.config.max_length
-        ).to(self.config.device)
-
-        with torch.no_grad():
-            outputs = self.model_8b.generate(
-                **inputs,
-                max_new_tokens=128,
-                temperature=0.4,
-                top_p=self.config.top_p,
-                do_sample=True,
-                pad_token_id=self.tokenizer_8b.pad_token_id
-            )
-
-        response = self.tokenizer_8b.decode(
-            outputs[0][inputs['input_ids'].shape[1]:],
-            skip_special_tokens=True
-        )
-        return response.strip()
-
-    def get_slm_response(self, question, prompt, context) -> str:
-        system_prompt = "You are a helpful assistant who reads the paragraph and answers questions concisely."
-        final_prompt = (f" \n\n Paragraph: {prompt} \n\n Just for context you have answered previously"
-                        f" these questions:{context} \n Here is a new question: {question}\n  Answer:")
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": final_prompt},
-        ]
-
-        chat_prompt = self.tokenizer_1b.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-
-        inputs = self.tokenizer_1b(chat_prompt, return_tensors="pt").to(self.config.device)
-
-        outputs = self.model_1b.generate(
-            **inputs,
-            max_new_tokens=128,
-            num_return_sequences=1
-        )
-
-        response = self.tokenizer_1b.decode(
-            outputs[0][inputs['input_ids'].shape[1]:],
-            skip_special_tokens=True
-        )
-        return response
-
     def compute_reinforce_loss(
             self,
             question: str,
-            responses: List[str],
+            slm_response: str,
+            llm_response: str,
             system_prompt: str,
             prompt: str,
             prev_context: str
     ) -> torch.Tensor:
-        student_response = responses[0]
-        teacher_response = self._generate_teacher_response(question, system_prompt, prompt, prev_context)
+        student_response = slm_response
+        teacher_response = llm_response
         _, _, f1 = bert_score_func([student_response], [teacher_response], lang="en", model_type='bert-base-uncased',
                                    device=self.config.device)
         reward = f1.squeeze()
@@ -182,24 +116,41 @@ class LlamaRLTrainer:
         return loss
 
     def train_step(self, question: str, system_prompt: str, prompt: str, prev_context: str):
-        self.config.num_responses = 1
-        response = self.get_slm_response(question, prompt, prev_context)
+        slm_response = get_response_for(
+            device_to_load=RLConfig.device,
+            model=self.model_1b,
+            tokenizer=self.tokenizer_1b,
+            current_question=question,
+            system_prompt=system_prompt,
+            comprehension=prompt,
+            previously_answered_questions=prev_context
+        )
+        llm_response = get_response_for(
+            device_to_load=RLConfig.device,
+            model=self.model_8b,
+            tokenizer=self.tokenizer_8b,
+            current_question=question,
+            system_prompt=system_prompt,
+            comprehension=prompt,
+            previously_answered_questions=prev_context
+        )
 
         self.optimizer.zero_grad()
-        loss = self.compute_reinforce_loss(question, response, system_prompt, prompt, prev_context)
+
+        loss = self.compute_reinforce_loss(
+            question=question,
+            slm_response=slm_response,
+            llm_response=llm_response,
+            system_prompt=system_prompt,
+            prompt=prompt,
+            prev_context=prev_context)
+
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model_1b.parameters(), 1.0)
         self.optimizer.step()
-
-        return loss.item(), response
-
-    def reward_function(self, question: str, responses: list[str]) -> list[float]:
-        rankings = self.rank_responses(question, responses)
-        rewards = self.compute_rewards(rankings, len(responses))
-        return rewards
+        return loss.item(), slm_response
 
     def train(self, dataset: Dataset, system_prompt: str, save_path: str = "%s" % SAVE_PATH):
-
         for epoch in range(self.config.num_epochs):
             logger.info(f"\nEpoch {epoch + 1}/{self.config.num_epochs}")
             total_loss = 0

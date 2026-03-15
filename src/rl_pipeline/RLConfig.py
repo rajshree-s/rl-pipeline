@@ -9,7 +9,7 @@ class RLConfig:
     learning_rate: float = 1e-5
     num_epochs: int = 1  # Reduce for testing
     max_length: int = 256  # Reduced from 512
-    num_responses: int = 2  # Reduced from 3
+    num_responses: int = 1  # Reduced from 3
     temperature: float = 0.8
     top_p: float = 0.9
     ppo_epochs: int = 1
