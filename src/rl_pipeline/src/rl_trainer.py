@@ -8,14 +8,11 @@ from torch.nn import functional as F
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from rl_pipeline.Constants import SAVE_PATH
-from rl_pipeline.GeneralFunctions import get_response_for
-from rl_pipeline.RLConfig import RLConfig
+from rl_pipeline.src.constants import SAVE_PATH
+from rl_pipeline.src.utils import get_response_for, get_logger
+from rl_pipeline.src.config import RLConfig
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
+logger = get_logger()
 class LlamaRLTrainer:
 
     def __init__(self, config: RLConfig):
@@ -75,19 +72,28 @@ class LlamaRLTrainer:
     def compute_reinforce_loss(
             self,
             question: str,
-            slm_response: str,
-            llm_response: str,
+            comprehension: str,
             system_prompt: str,
-            prompt: str,
-            prev_context: str
+            previously_asked_questions: str,
+            slm_response: str,
+            llm_response: str
     ) -> torch.Tensor:
         student_response = slm_response
         teacher_response = llm_response
-        _, _, f1 = bert_score_func([student_response], [teacher_response], lang="en", model_type='bert-base-uncased',
-                                   device=self.config.device)
+        _, _, f1 = bert_score_func(
+            [student_response],
+            [teacher_response],
+            lang="en",
+            model_type='bert-base-uncased',
+            device=self.config.device
+        )
         reward = f1.squeeze()
 
-        prompt_text = f"{system_prompt}\n\n Paragraph: {prompt}\n\nQuestion: {question}\nHere are the previously asked questions:{prev_context}\n Answer:"
+        prompt_text = (f"{system_prompt}\n\n "
+                       f"Paragraph: {comprehension}\n\n"
+                       f"Question: {question}\n"
+                       f"Here are the previously asked questions:{previously_asked_questions}\n "
+                       f"Answer:")
         full_text = prompt_text + student_response
 
         inputs = self.tokenizer_1b(
@@ -102,7 +108,10 @@ class LlamaRLTrainer:
         logits = outputs.logits
         log_probs = F.log_softmax(logits[:, :-1, :], dim=-1)
 
-        prompt_tokens_ids = self.tokenizer_1b(prompt_text, return_tensors="pt", padding=True).to(self.config.device)[
+        prompt_tokens_ids = self.tokenizer_1b(
+            prompt_text,
+            return_tensors="pt",
+            padding=True).to(self.config.device)[
             'input_ids']
         prompt_length = prompt_tokens_ids.shape[1]
 
@@ -138,12 +147,12 @@ class LlamaRLTrainer:
         self.optimizer.zero_grad()
 
         loss = self.compute_reinforce_loss(
+            comprehension=prompt,
             question=question,
+            system_prompt=system_prompt,
             slm_response=slm_response,
             llm_response=llm_response,
-            system_prompt=system_prompt,
-            prompt=prompt,
-            prev_context=prev_context)
+            previously_asked_questions=prev_context)
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model_1b.parameters(), 1.0)
@@ -184,7 +193,6 @@ class LlamaRLTrainer:
         return model_path
 
     def save_model(self, path: str):
-        """Save the trained model"""
         self.model_1b.save_pretrained(path)
         self.tokenizer_1b.save_pretrained(path)
         logger.info(f"Model saved to {path}")

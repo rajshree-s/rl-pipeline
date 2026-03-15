@@ -2,8 +2,8 @@ from unittest import TestCase
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from rl_pipeline.GeneralFunctions import get_response_for
-from rl_pipeline.RLConfig import RLConfig
+from rl_pipeline import get_response_for
+from rl_pipeline import RLConfig
 
 
 class TestFunctionsFor1BModel(TestCase):
