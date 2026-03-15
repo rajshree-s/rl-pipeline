@@ -1,3 +1,4 @@
+import logging
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
@@ -8,6 +9,9 @@ from rl_pipeline.RougeScore import compare_slm_rouge_scores
 from rl_pipeline.datasets.coqa import CoqaDataset
 import json
 import os
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def query_model(path, question: str, hf_token=None):
@@ -50,7 +54,7 @@ def finetune_model():
     trainer = LlamaRLTrainer(config)
     path_ = ("%s" % SAVE_PATH)
     dataset = CoqaDataset().load_dataset("train")
-    print("Dataset loaded Successfully")
+    logger.info("Dataset loaded Successfully")
 
     return trainer.train(
         dataset=dataset,
@@ -61,21 +65,21 @@ def finetune_model():
 
 def test_model(path):
     ground_truth, new_responses, old_responses = responses(path)
-    print("testing_model")
+    logger.info("testing_model")
     if ground_truth != [] and new_responses != [] and old_responses != []:
-        print(compare_slm_rouge_scores(ground_truth, new_responses, old_responses))
+        logger.info(compare_slm_rouge_scores(ground_truth, new_responses, old_responses))
     else:
-        print("There exists a null value")
+        logger.warning("There exists a null value in ground_truth, new_responses, or old_responses.")
 
 
 def save_list_to_file(data_list, filename):
     try:
         with open(filename, 'w') as f:
             json.dump(data_list, f)
-        print(f"Successfully saved to {filename}")
+        logger.info(f"Successfully saved to {filename}")
         return True
     except Exception as e:
-        print(f"Failed to save: {e}")
+        logger.error(f"Failed to save {filename}: {e}")
         return False
 
 
@@ -83,10 +87,10 @@ def load_list_from_file(filename):
     try:
         with open(filename, 'r') as f:
             data = json.load(f)
-            print(f"Successfully loaded {len(data)} items.")
+            logger.info(f"Successfully loaded {len(data)} items from {filename}.")
             return data
     except Exception as e:
-        print(f"Error reading file: {e}")
+        logger.error(f"Error reading file {filename}: {e}")
         return []
 
 
@@ -97,25 +101,25 @@ def get_responses(test_data, path, filename):
             for data in test_data]
         save_list_to_file(response, filename)
         return response
-    print("using the saved responses")
+    logger.info("using the saved responses")
     return load_list_from_file(filename)
 
 def save_list_to_file(data_list, filename):
     try:
         with open(filename, 'w') as f:
             json.dump(data_list, f)
-        print(f"Successfully saved to {filename}")
+        logger.info(f"Successfully saved to {filename}")
         return True
     except Exception as e:
-        print(f"Failed to save: {e}")
+        logger.error(f"Failed to save {filename}: {e}")
         return False
 
 def responses(path):
     test_data = CoqaDataset().load_dataset(split="validation", no_of_records=2)
-    print(f"Here is the test data: {test_data}")
-    print("fetching the old responses")
+    logger.info(f"Here is the test data: {test_data}")
+    logger.info("fetching the old responses")
     old_responses = get_responses(test_data, RLConfig.model_1b_path, "old_responses.json")
-    print("fetching the new responses")
+    logger.info("fetching the new responses")
     new_responses = get_responses(test_data, path, "new_responses.json")
 
     ground_truth = [data.expected_response for data in test_data]
